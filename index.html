@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HKDSE SQL 模擬學習器｜歌手數據庫（終極完整版）</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,"Microsoft JhengHei",sans-serif}
+body{margin:10px;background:#f7f9fc}
+.container{max-width:1200px;margin:auto}
+.panel{background:white;border-radius:10px;padding:15px 20px;margin-bottom:15px;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+h1{color:#222;margin:0 0 10px;font-size:22px}
+h2{font-size:18px;color:#444;margin-bottom:8px}
+.sql-input{width:100%;height:150px;padding:10px;font-size:15px;border:1px solid #ccc;border-radius:6px;resize:vertical}
+.btn-run{background:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;margin-top:8px;font-size:15px}
+.btn-run:hover{background:#0069d9}
+.btn-reset{background:#6c757d;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;margin-top:8px;margin-left:8px;font-size:15px}
+.btn-reset:hover{background:#5a6268}
+.error{color:#dc3545;font-weight:bold;margin:10px 0}
+.success{color:#28a745;font-weight:bold;margin:10px 0}
+.result-table{width:100%;border-collapse:collapse;margin-top:10px;overflow-x:auto;display:block}
+.result-table th,.result-table td{border:1px solid #ddd;padding:8px;text-align:left;font-size:14px}
+.result-table th{background:#f1f1f1}
+.pre-code{background:#f8f9fa;padding:10px;border-radius:6px;overflow-x:auto;font-size:14px}
+.dse-tips{background:#fff3cd;border-left:4px solid #ffc107;padding:10px;margin:10px 0;border-radius:4px}
+@media (max-width: 768px) {
+  .container{padding:0 10px}
+  .panel{padding:10px 15px}
+  h1{font-size:20px}
+  h2{font-size:16px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="panel">
+<h1>HKDSE SQL 模擬學習器（歌手數據庫）｜終極完整版</h1>
+<p>✅ 內建所有 DSE ICT 數據庫單元必考功能</p>
+<div class="dse-tips">💡 <strong>DSE 備戰貼士</strong>：考試中常考「查詢 + 排序 + 統計」的組合，以及數據修改操作。記住所有關鍵字的正確拼寫！</div>
+</div>
+
+<div class="panel">
+<h2>數據庫表格：singers（欄目清單）</h2>
+<div class="pre-code">
+藝名 (主鍵), 本名, 性別, 出生年份, 出生地, 職業, 出道年份, 主要語言, 所屬平台/廠牌, 狀態, 代表作品
+</div>
+<p>支援：SELECT / INSERT / UPDATE / DELETE / ORDER BY / GROUP BY / COUNT / DISTINCT / LIMIT / AS</p>
+<textarea class="sql-input" id="sqlInput" placeholder="-- 輸入 SQL 指令，支援所有 DSE 必考語法
+-- 範例 1：查詢
+SELECT 藝名, 出道年份 FROM singers WHERE 性別='女' ORDER BY 出道年份 DESC LIMIT 5
+
+-- 範例 2：新增
+INSERT INTO singers (藝名, 本名, 性別, 出道年份, 所屬平台/廠牌, 狀態) 
+VALUES ('陳卓賢','陳卓賢','男',2018,'MIRROR','活躍')
+
+-- 範例 3：修改
+UPDATE singers SET 狀態='半退隱' WHERE 藝名='劉德華'
+
+-- 範例 4：刪除
+DELETE FROM singers WHERE 藝名='試當真'
+
+-- 範例 5：統計
+SELECT 所屬平台/廠牌, COUNT(*) AS 藝人數量 FROM singers GROUP BY 所屬平台/廠牌"></textarea>
+<br>
+<button class="btn-run" onclick="runSQL()">執行 SQL</button>
+<button class="btn-reset" onclick="resetData()">還原原始數據</button>
+</div>
+
+<div class="panel">
+<h2>錯誤提示（對應 DSE 評分標準）</h2>
+<div id="errorArea" class="error"></div>
+</div>
+
+<div class="panel">
+<h2>查詢結果</h2>
+<div id="resultArea"></div>
+</div>
+
+</div>
+
+<script>
+// ====================== 原始數據備份 ======================
+const backupData = [
+["張學友","張學友","男",1961,"香港","歌手 / 演員",1984,"粵語","環球唱片","活躍","《吻別》《一路上有你》"],
+["陳奕迅","陳奕迅","男",1974,"香港","歌手 / 演員",1995,"粵語","環球唱片","活躍","《K歌之王》《十年》"],
+["梅艷芳","梅艷芳","女",1963,"香港","歌手 / 演員",1982,"粵語","華星唱片","已故","《女人花》《壞女孩》"],
+["張國榮","張國榮","男",1956,"香港","歌手 / 演員",1985,"粵語","華星唱片","已故","《沉默是金》《男人哭吧不是罪》"],
+["劉德華","劉福榮","男",1961,"香港","歌手 / 演員",1999,"粵語","寰亞音樂","活躍","《忘情水》《心經》"],
+["容祖兒","容祖兒","女",1980,"香港","歌手",1999,"粵語","英皇娛樂","活躍","《習慣失戀》《心淡》"],
+["謝安琪","謝安琪","女",1977,"香港","歌手",2005,"粵語","新藝寶唱片","活躍","《喜帖街》《鍾無艷》"],
+["張敬軒","張敬軒","男",1981,"廣州","歌手",2002,"粵語","英皇娛樂","活躍","《酷愛》《櫻花樹下》"],
+["許廷鏗","許廷鏗","男",1988,"香港","歌手",2010,"粵語","星夢娛樂","活躍","《面具》《青春頌》"],
+["陳柏宇","陳柏宇","男",1983,"香港","歌手",2007,"粵語","Sony Music","活躍","《你瞞我瞞》《逸後》"],
+["林家謙","林家謙","男",1991,"香港","歌手 / 音樂製作人",2019,"粵語","Terence Lam Production","活躍","《下一位前度》《一人之境》"],
+["姜濤","姜濤","男",1999,"香港","歌手 / 演員",2018,"粵語","MIRROR","活躍","《蒙着嘴說愛你》《Master Class》"],
+["呂爵安","呂爵安","男",1997,"香港","歌手 / 演員",2018,"粵語","MIRROR","活躍","《E先生 連環不幸事件》《We All Are》"],
+["盧瀚霆","盧瀚霆","男",1995,"香港","歌手 / 演員",2018,"粵語","MIRROR","活躍","《Megahit》《不可愛教主》"],
+["陳蕾","陳蕾","女",1990,"香港","歌手",2016,"粵語","環球唱片","活躍","《凡星》《世界與你無關》"],
+["COLLAR","NULL","女團",null,"香港","歌手",2021,"粵語","MakerVille","活躍","《Call My Name!》《Never-never Land》"],
+["炎明熹","王佳恩","女",2005,"香港","歌手",2021,"粵語","TVB Music Group","活躍","《真话的清高》《复杂》"],
+["姚焯菲","姚焯菲","女",2006,"香港","歌手",2021,"粵語","TVB Music Group","活躍","《原来谈恋爱是这么一回事》"],
+["鍾柔美","鍾柔美","女",2007,"香港","歌手",2021,"粵語","TVB Music Group","活躍","《Breakin' My Heart》"],
+["試當真","NULL","團體",null,"香港","網絡創作 / 藝人",2020,"粵語","YouTube","活躍","《試當真》節目系列"]
+];
+
+const columns = [
+"藝名","本名","性別","出生年份","出生地","職業","出道年份",
+"主要語言","所屬平台/廠牌","狀態","代表作品"
+];
+
+// 工作數據（可修改）
+let dbData = [...backupData];
+
+// ====================== 重置數據 ======================
+function resetData() {
+  dbData = [...backupData];
+  document.getElementById("errorArea").innerHTML = "";
+  document.getElementById("resultArea").innerHTML = "<p class='success'>✅ 數據已還原到初始狀態</p>";
+}
+
+// ====================== SQL 解析與執行核心 ======================
+function runSQL() {
+  let sql = document.getElementById("sqlInput").value.trim();
+  let err = document.getElementById("errorArea");
+  let res = document.getElementById("resultArea");
+  err.innerHTML = "";
+  res.innerHTML = "";
+
+  // 清除註釋
+  sql = sql.replace(/--.*$/gm, '').trim();
+  if (!sql) {
+    err.innerHTML = "❌ 未輸入有效 SQL 指令（註釋已被忽略）";
+    return;
+  }
+
+  // 判斷指令類型
+  if (/^SELECT/i.test(sql)) {
+    handleSelect(sql);
+  } else if (/^INSERT/i.test(sql)) {
+    handleInsert(sql);
+  } else if (/^UPDATE/i.test(sql)) {
+    handleUpdate(sql);
+  } else if (/^DELETE/i.test(sql)) {
+    handleDelete(sql);
+  } else {
+    err.innerHTML = "❌ 只支援 SELECT / INSERT / UPDATE / DELETE 指令（DSE 範圍內）";
+  }
+}
+
+// ====================== 處理 SELECT 查詢 ======================
+function handleSelect(sql) {
+  let err = document.getElementById("errorArea");
+  let res = document.getElementById("resultArea");
+
+  try {
+    // 基礎檢查
+    if (!sql.match(/FROM\s+(\w+)/i)) {
+      throw new Error("缺少 FROM 關鍵字，必須指定表格（FROM singers）");
+    }
+    if (sql.match(/FROM\s+(\w+)/i)[1].toLowerCase() !== "singers") {
+      throw new Error("本數據庫只有一個表格：singers");
+    }
+
+    // 解析 SELECT 欄目
+    let selectPart = sql.split(/FROM/i)[0].replace(/SELECT/i, "").trim();
+    if (!selectPart) {
+      throw new Error("SELECT 後必須指定欄目，例如 SELECT 藝名 FROM singers");
+    }
+    let wantedCols = selectPart.split(",").map(s => s.trim());
+    let invalidCols = wantedCols.filter(c => 
+      !c.includes("COUNT(") && c !== "*" && !columns.includes(c.split(" AS ")[0].trim().replace("DISTINCT ", ""))
+    );
+    if (invalidCols.length > 0) {
+      throw new Error(`欄目「${invalidCols[0]}」不存在，請檢查拼寫`);
+    }
+
+    // 解析 WHERE 條件
+    let whereExp = null;
+    if (/\bWHERE\b/i.test(sql)) {
+      let wherePart = sql.split(/WHERE/i)[1].split(/\b(ORDER BY|GROUP BY|LIMIT)\b/i)[0].trim();
+      if (!wherePart) {
+        throw new Error("WHERE 後必須跟隨條件，例如 WHERE 性別='女'");
+      }
+      whereExp = wherePart;
+    }
+
+    // 解析 ORDER BY
+    let orderBy = null;
+    if (/\bORDER BY\b/i.test(sql)) {
+      let orderPart = sql.split(/ORDER BY/i)[1].split(/\b(LIMIT|GROUP BY)\b/i)[0].trim();
+      if (!orderPart) {
+        throw new Error("ORDER BY 後必須指定欄目，例如 ORDER BY 出道年份 DESC");
+      }
+      let [col, dir = "ASC"] = orderPart.split(/\s+/);
+      if (!columns.includes(col)) {
+        throw new Error(`排序欄目「${col}」不存在`);
+      }
+      orderBy = { column: col, direction: dir.toUpperCase() };
+    }
+
+    // 解析 LIMIT
+    let limit = null;
+    if (/\bLIMIT\b/i.test(sql)) {
+      let limitPart = sql.split(/LIMIT/i)[1].trim();
+      if (!limitPart || isNaN(limitPart)) {
+        throw new Error("LIMIT 後必須跟隨數字，例如 LIMIT 5");
+      }
+      limit = parseInt(limitPart);
+    }
+
+    // 解析 GROUP BY
+    let groupBy = null;
+    if (/\bGROUP BY\b/i.test(sql)) {
+      let groupPart = sql.split(/GROUP BY/i)[1].split(/\b(ORDER BY|LIMIT)\b/i)[0].trim();
+      if (!groupPart) {
+        throw new Error("GROUP BY 後必須指定欄目，例如 GROUP BY 所屬平台/廠牌");
+      }
+      if (!columns.includes(groupPart)) {
+        throw new Error(`分組欄目「${groupPart}」不存在`);
+      }
+      groupBy = groupPart;
+    }
+
+    // 執行查詢
+    let result = executeSelect(wantedCols, whereExp, orderBy, limit, groupBy);
+    displayResult(result, wantedCols, groupBy);
+    err.innerHTML = `✅ 查詢成功，返回 ${result.length} 筆記錄`;
+  } catch (e) {
+    err.innerHTML = `❌ 查詢錯誤：${e.message}`;
+  }
+}
+
+// ====================== 執行 SELECT 查詢 ======================
+function executeSelect(wantedCols, whereExp, orderBy, limit, groupBy) {
+  // 轉換為物件陣列
+  let data = dbData.map(row => Object.fromEntries(columns.map((c,i)=>[c,row[i]])));
+
+  // 應用 WHERE 過濾
+  if (whereExp) {
+    data = data.filter(row => {
+      let expr = whereExp.replace(/(\w+)/g, (_, key) => 
+        columns.includes(key) ? `row['${key}']` : _
+      );
+      return eval(expr);
+    });
+  }
+
+  // 應用 GROUP BY 與 COUNT
+  if (groupBy) {
+    const groups = {};
+    data.forEach(row => {
+      const key = row[groupBy];
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(row);
+    });
+    data = Object.entries(groups).map(([key, rows]) => ({
+      [groupBy]: key,
+      "COUNT(*)": rows.length
+    }));
+  }
+
+  // 應用 ORDER BY
+  if (orderBy) {
+    data.sort((a, b) => {
+      let valA = a[orderBy.column];
+      let valB = b[orderBy.column];
+      if (valA === null) return 1;
+      if (valB === null) return -1;
+      if (typeof valA === 'number') {
+        return orderBy.direction === "ASC" ? valA - valB : valB - valA;
+      } else {
+        return orderBy.direction === "ASC" 
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      }
+    });
+  }
+
+  // 應用 LIMIT
+  if (limit) {
+    data = data.slice(0, limit);
+  }
+
+  // 處理 DISTINCT
+  if (wantedCols.some(c => c.startsWith("DISTINCT "))) {
+    let distinctCol = wantedCols.find(c => c.startsWith("DISTINCT ")).replace("DISTINCT ", "").trim();
+    let uniqueValues = [...new Set(data.map(row => row[distinctCol]))];
+    data = uniqueValues.map(val => ({ [distinctCol]: val }));
+  }
+
+  return data;
+}
+
+// ====================== 處理 INSERT 新增 ======================
+function handleInsert(sql) {
+  let err = document.getElementById("errorArea");
+  let res = document.getElementById("resultArea");
+
+  try {
+    // 解析 INSERT
+    let match = sql.match(/INSERT INTO singers \((.*?)\) VALUES \((.*?)\)/i);
+    if (!match) {
+      throw new Error("INSERT 語法錯誤，正確格式：INSERT INTO singers (欄目1, 欄目2) VALUES ('值1', '值2')");
+    }
+
+    let cols = match[1].split(",").map(c => c.trim());
+    let vals = match[2].split(",").map(v => {
+      v = v.trim();
+      // 移除引號
+      if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
+        return v.substring(1, v.length-1);
+      }
+      // 數字轉換
+      if (!isNaN(v)) return parseInt(v);
+      // NULL 處理
+      if (v.toUpperCase() === 'NULL') return null;
+      return v;
+    });
+
+    // 檢查欄目合法性
+    let invalidCols = cols.filter(c => !columns.includes(c));
+    if (invalidCols.length > 0) {
+      throw new Error(`欄目「${invalidCols[0]}」不存在`);
+    }
+
+    // 建立新記錄
+    let newRow = new Array(columns.length).fill(null);
+    cols.forEach((col, i) => {
+      let idx = columns.indexOf(col);
+      newRow[idx] = vals[i];
+    });
+
+    // 檢查主鍵（藝名）是否存在
+    if (!newRow[0]) {
+      throw new Error("必須指定主鍵「藝名」");
+    }
+    if (dbData.some(row => row[0] === newRow[0])) {
+      throw new Error(`藝名「${newRow[0]}」已存在，主鍵不能重複`);
+    }
+
+    // 新增記錄
+    dbData.push(newRow);
+    res.innerHTML = `<p class='success'>✅ 成功新增 1 筆記錄：藝名「${newRow[0]}」</p>`;
+  } catch (e) {
+    err.innerHTML = `❌ 新增錯誤：${e.message}`;
+  }
+}
+
+// ====================== 處理 UPDATE 修改 ======================
+function handleUpdate(sql) {
+  let err = document.getElementById("errorArea");
+  let res = document.getElementById("resultArea");
+
+  try {
+    // 解析 UPDATE
+    let match = sql.match(/UPDATE singers SET (.*?) WHERE (.*)/i);
+    if (!match) {
+      throw new Error("UPDATE 語法錯誤，正確格式：UPDATE singers SET 欄目='值' WHERE 條件");
+    }
+
+    let setPart = match[1];
+    let wherePart = match[2];
+
+    // 解析 SET
+    let setPairs = setPart.split(",").map(p => p.trim().split("="));
+    let updates = {};
+    setPairs.forEach(([col, val]) => {
+      col = col.trim();
+      val = val.trim();
+      if (!columns.includes(col)) {
+        throw new Error(`欄目「${col}」不存在`);
+      }
+      // 處理值
+      if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+        val = val.substring(1, val.length-1);
+      } else if (!isNaN(val)) {
+        val = parseInt(val);
+      } else if (val.toUpperCase() === 'NULL') {
+        val = null;
+      }
+      updates[col] = val;
+    });
+
+    // 解析 WHERE
+    let whereExp = wherePart;
+    if (!whereExp) {
+      throw new Error("必須指定 WHERE 條件，否則會修改所有記錄");
+    }
+
+    // 執行更新
+    let count = 0;
+    dbData = dbData.map(row => {
+      let rowObj = Object.fromEntries(columns.map((c,i)=>[c,row[i]]));
+      let expr = whereExp.replace(/(\w+)/g, (_, key) => 
+        columns.includes(key) ? `rowObj['${key}']` : _
+      );
+      if (eval(expr)) {
+        count++;
+        for (let col in updates) {
+          let idx = columns.indexOf(col);
+          row[idx] = updates[col];
+        }
+      }
+      return row;
+    });
+
+    if (count === 0) {
+      res.innerHTML = "<p class='success'>ℹ️ 沒有記錄符合 WHERE 條件，數據未被修改</p>";
+    } else {
+      res.innerHTML = `<p class='success'>✅ 成功修改 ${count} 筆記錄</p>`;
+    }
+  } catch (e) {
+    err.innerHTML = `❌ 修改錯誤：${e.message}`;
+  }
+}
+
+// ====================== 處理 DELETE 刪除 ======================
+function handleDelete(sql) {
+  let err = document.getElementById("errorArea");
+  let res = document.getElementById("resultArea");
+
+  try {
+    // 解析 DELETE
+    let match = sql.match(/DELETE FROM singers WHERE (.*)/i);
+    if (!match) {
+      throw new Error("DELETE 語法錯誤，正確格式：DELETE FROM singers WHERE 條件");
+    }
+
+    let whereExp = match[1];
+    if (!whereExp) {
+      throw new Error("必須指定 WHERE 條件，否則會刪除所有記錄");
+    }
+
+    // 執行刪除
+    let originalCount = dbData.length;
+    dbData = dbData.filter(row => {
+      let rowObj = Object.fromEntries(columns.map((c,i)=>[c,row[i]]));
+      let expr = whereExp.replace(/(\w+)/g, (_, key) => 
+        columns.includes(key) ? `rowObj['${key}']` : _
+      );
+      return !eval(expr);
+    });
+
+    let deleted = originalCount - dbData.length;
+    if (deleted === 0) {
+      res.innerHTML = "<p class='success'>ℹ️ 沒有記錄符合 WHERE 條件，數據未被修改</p>";
+    } else {
+      res.innerHTML = `<p class='success'>✅ 成功刪除 ${deleted} 筆記錄</p>`;
+    }
+  } catch (e) {
+    err.innerHTML = `❌ 刪除錯誤：${e.message}`;
+  }
+}
+
+// ====================== 顯示查詢結果 ======================
+function displayResult(result, wantedCols, groupBy) {
+  let res = document.getElementById("resultArea");
+  if (result.length === 0) {
+    res.innerHTML = "<p>📊 查詢結果為空</p>";
+    return;
+  }
+
+  // 確定顯示欄目
+  let displayCols = wantedCols.includes("*") 
+    ? columns 
+    : wantedCols.map(c => c.split(" AS ")[0].trim().replace("DISTINCT ", ""));
+
+  // 如果是分組查詢，調整顯示欄目
+  if (groupBy) {
+    displayCols = [groupBy, "COUNT(*)"];
+  }
+
+  // 生成表格
+  let html = `<div class="result-table"><table border="1"><tr>`;
+  displayCols.forEach(c => {
+    let alias = wantedCols.find(col => col.startsWith(c))?.split(" AS ")[1] || c;
+    html += `<th>${alias}</th>`;
+  });
+  html += `</tr>`;
+  result.forEach(row => {
+    html += `<tr>`;
+    displayCols.forEach(c => html += `<td>${row[c] ?? ""}</td>`);
+    html += `</tr>`;
+  });
+  html += `</table></div>`;
+  res.innerHTML = html;
+}
+</script>
+</body>
+</html>
